@@ -160,28 +160,10 @@ def analyze_audio():
         except Exception as e:
             logger.error(f"Error deleting temporary file: {str(e)}")
 
-# Update app configuration
+# Update the app configuration
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.config['UPLOAD_FOLDER'] = str(UPLOAD_DIR)
 
-# Production configurations
-if not app.debug:
-    import logging
-    from logging.handlers import RotatingFileHandler
-    
-    # Ensure the logs directory exists
-    Path('logs').mkdir(exist_ok=True)
-    
-    # Set up logging
-    file_handler = RotatingFileHandler('logs/meowlytics.log', maxBytes=10240, backupCount=10)
-    file_handler.setFormatter(logging.Formatter(
-        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-    ))
-    file_handler.setLevel(logging.INFO)
-    app.logger.addHandler(file_handler)
-    app.logger.setLevel(logging.INFO)
-    app.logger.info('Meowlytics startup')
-
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    # Production mode
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
