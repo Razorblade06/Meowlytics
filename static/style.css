@@ -87,6 +87,23 @@ body {
     transition: all 0.3s ease;
 }
 
+.btn-danger.recording {
+    background-color: #dc3545;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
 .drop-zone__input {
     display: none;
 }
@@ -108,4 +125,14 @@ body {
     height: 100%;
     background-color: #0d6efd;
     transition: width 0.3s ease;
+}
+
+#recordingStatus {
+    max-width: 300px;
+    margin: 0 auto;
+}
+
+.progress {
+    height: 10px;
+    border-radius: 5px;
 }
