@@ -69,18 +69,26 @@ def extract_features(audio_path):
     try:
         if not os.path.exists(audio_path):
             logger.error(f"Audio file not found at {audio_path}")
-            return None
+            return None, None
 
         y, sr = librosa.load(audio_path, sr=SAMPLE_RATE, duration=DURATION)
         if len(y) == 0:
             logger.error("Audio file is empty or corrupted")
-            return None
+            return None, None
 
         target_length = SAMPLE_RATE * DURATION
         if len(y) < target_length:
             y = np.pad(y, (0, target_length - len(y)))
         else:
             y = y[:target_length]
+
+        # Get frequency data for visualization
+        D = librosa.stft(y)
+        mag_db = librosa.amplitude_to_db(abs(D))
+        freq_data = {
+            'frequencies': [float(f) for f in librosa.fft_frequencies(sr=sr)[:100]],
+            'magnitudes': [float(m) for m in np.mean(mag_db, axis=1)[:100]]
+        }
 
         mel_spec = librosa.feature.melspectrogram(
             y=y,
@@ -90,10 +98,11 @@ def extract_features(audio_path):
         )
         mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)
         mel_spec_norm = (mel_spec_db - mel_spec_db.min()) / (mel_spec_db.max() - mel_spec_db.min())
-        return mel_spec_norm.reshape(1, -1)
+        
+        return mel_spec_norm.reshape(1, -1), freq_data
     except Exception as e:
         logger.error(f"Error processing audio: {str(e)}")
-        return None
+        return None, None
 
 ALLOWED_EXTENSIONS = {'wav', 'mp3', 'ogg'}
 
@@ -131,8 +140,7 @@ def analyze_audio():
         # Use tempfile to safely handle uploaded files
         with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as tmp:
             file.save(tmp.name)
-            features = extract_features(tmp.name)
-            
+            features, freq_data = extract_features(tmp.name)
             if features is None:
                 return jsonify({'error': 'Error processing audio file', 'success': False}), 400
 
@@ -140,14 +148,18 @@ def analyze_audio():
                 return jsonify({'error': 'Model not loaded', 'success': False}), 500
 
             prediction = model.predict(features)
-            probabilities = model.predict_proba(features)[0]
-            confidence = float(np.max(probabilities))
-            predicted_class = label_encoder.inverse_transform(prediction)[0]
+            probabilities = model.predict_proba(features)[0].tolist()  # Convert to list
+            confidence = float(np.max(probabilities))  # Convert to native Python float
+            predicted_class = str(label_encoder.inverse_transform(prediction)[0])  # Convert to string
             
             result = {
                 'class': predicted_class,
-                'confidence': round(confidence * 100, 2),
-                'success': True
+                'confidence': round(float(confidence * 100), 2),  # Ensure float
+                'success': True,
+                'freq_data': {
+                    'frequencies': [float(f) for f in freq_data['frequencies']],
+                    'magnitudes': [float(m) for m in freq_data['magnitudes']]
+                }
             }
             return jsonify(result)
     except Exception as e:
@@ -165,5 +177,5 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.config['UPLOAD_FOLDER'] = str(UPLOAD_DIR)
 
 if __name__ == '__main__':
-    # Production mode
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+    # Development mode with different port
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)

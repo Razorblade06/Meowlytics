@@ -10,11 +10,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const recordingStatus = document.getElementById('recordingStatus');
     const recordingTime = document.getElementById('recordingTime');
     const progressBar = recordingStatus.querySelector('.progress-bar');
-
+    const audioControls = document.getElementById('audioControls');
+    const playButton = document.getElementById('playButton');
     let mediaRecorder;
     let audioChunks = [];
     let recordingTimer;
     let recordingDuration = 0;
+    let freqChart = null;
+    let audioPlayer;
+    let audioUrl;
 
     // Prevent default drag behaviors
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -50,6 +54,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle record button
     recordButton.addEventListener('click', toggleRecording);
 
+    playButton.addEventListener('click', togglePlayback);
+
     function preventDefaults(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -71,7 +77,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function handleFileSelect(e) {
-        updateDropZoneText(e.target.files[0]);
+        const file = e.target.files[0];
+        updateDropZoneText(file);
+        
+        // Create audio URL for playback
+        if (audioUrl) {
+            URL.revokeObjectURL(audioUrl);
+        }
+        audioUrl = URL.createObjectURL(file);
+        audioPlayer.src = audioUrl;
+        audioControls.classList.remove('d-none');
     }
 
     function updateDropZoneText(file) {
@@ -134,6 +149,56 @@ document.addEventListener('DOMContentLoaded', function() {
             `Your cat is likely expressing: ${data.class}`;
         result.querySelector('.confidence-text').textContent = 
             `Confidence: ${data.confidence}%`;
+
+        // Update frequency graph
+        if (data.freq_data) {
+            updateFrequencyGraph(data.freq_data);
+        }
+    }
+
+    function updateFrequencyGraph(freqData) {
+        const ctx = document.getElementById('freqChart').getContext('2d');
+        
+        if (freqChart) {
+            freqChart.destroy();
+        }
+
+        freqChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: freqData.frequencies.map(f => Math.round(f) + 'Hz'),
+                datasets: [{
+                    label: 'Frequency Spectrum',
+                    data: freqData.magnitudes,
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.3,
+                    fill: true,
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)'
+                }]
+            },
+            options: {
+                responsive: false,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Magnitude (dB)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Frequency'
+                        }
+                    }
+                },
+                animation: {
+                    duration: 1000
+                }
+            }
+        });
     }
 
     function showError(message) {
@@ -279,10 +344,50 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function togglePlayback() {
+        if (audioPlayer.paused) {
+            audioPlayer.play();
+            playButton.innerHTML = '<i class="fas fa-pause"></i> Pause';
+        } else {
+            audioPlayer.pause();
+            playButton.innerHTML = '<i class="fas fa-play"></i> Play Sound';
+        }
+    }
+
+    // Clean up audio URL when audio ends
+    audioPlayer.addEventListener('ended', function() {
+        playButton.innerHTML = '<i class="fas fa-play"></i> Play Sound';
+    });
+
+    // Clean up function for file upload or recording changes
+    function clearAudio() {
+        if (audioUrl) {
+            URL.revokeObjectURL(audioUrl);
+            audioUrl = null;
+        }
+        audioPlayer.src = '';
+        audioControls.classList.add('d-none');
+    }
+
+    // Add clearAudio to clear button handler
+    clearButton.addEventListener('click', function(e) {
+        e.stopPropagation();
+        clearFile();
+        clearAudio();
+    });
+    
     function updateDropZoneWithRecording(file) {
         const dt = new DataTransfer();
         dt.items.add(file);
         fileInput.files = dt.files;
         updateDropZoneText(file);
+        
+        // Create audio URL for playback
+        if (audioUrl) {
+            URL.revokeObjectURL(audioUrl);
+        }
+        audioUrl = URL.createObjectURL(file);
+        audioPlayer.src = audioUrl;
+        audioControls.classList.remove('d-none');
     }
 });
