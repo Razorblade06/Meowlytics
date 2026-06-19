@@ -12,12 +12,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const progressBar = recordingStatus.querySelector('.progress-bar');
     const audioControls = document.getElementById('audioControls');
     const playButton = document.getElementById('playButton');
+    const audioPlayer = document.getElementById('audioPlayer');
     let mediaRecorder;
     let audioChunks = [];
     let recordingTimer;
     let recordingDuration = 0;
     let freqChart = null;
-    let audioPlayer;
     let audioUrl;
 
     // Prevent default drag behaviors

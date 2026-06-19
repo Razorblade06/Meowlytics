@@ -8,6 +8,13 @@ import os
 import logging
 import tempfile
 
+try:
+    from pydub import AudioSegment
+    PYDUB_AVAILABLE = True
+except ImportError:
+    PYDUB_AVAILABLE = False
+    AudioSegment = None
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -79,8 +86,40 @@ def extract_features(audio_path):
             return None, None
 
         logger.info(f"Loading audio file: {audio_path}")
-        y, sr = librosa.load(audio_path, sr=SAMPLE_RATE, duration=DURATION)
-        logger.info(f"Audio loaded successfully. Sample rate: {sr}, Duration: {len(y)/sr:.2f}s")
+        
+        # Try to load with librosa first
+        try:
+            y, sr = librosa.load(audio_path, sr=SAMPLE_RATE, duration=DURATION)
+            logger.info(f"Audio loaded successfully with librosa. Sample rate: {sr}, Duration: {len(y)/sr:.2f}s")
+        except Exception as librosa_error:
+            logger.warning(f"Librosa failed to load audio: {str(librosa_error)}")
+            
+            # If it's an MP3 file and librosa failed, try pydub conversion
+            if audio_path.lower().endswith('.mp3'):
+                logger.info("Attempting MP3 conversion via pydub...")
+                wav_path = convert_mp3_to_wav(audio_path)
+                if wav_path:
+                    try:
+                        y, sr = librosa.load(wav_path, sr=SAMPLE_RATE, duration=DURATION)
+                        logger.info(f"Successfully loaded converted WAV. Sample rate: {sr}")
+                        # Clean up the converted file
+                        try:
+                            os.unlink(wav_path)
+                        except:
+                            pass
+                    except Exception as e:
+                        logger.error(f"Failed to load converted WAV: {str(e)}")
+                        try:
+                            os.unlink(wav_path)
+                        except:
+                            pass
+                        return None, None
+                else:
+                    logger.error("MP3 to WAV conversion failed")
+                    return None, None
+            else:
+                # For other formats, re-raise the error
+                raise librosa_error
         
         if len(y) == 0:
             logger.error("Audio file is empty or corrupted")
@@ -122,6 +161,30 @@ ALLOWED_EXTENSIONS = {'wav', 'mp3', 'ogg'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def convert_mp3_to_wav(mp3_path):
+    """
+    Convert MP3 file to WAV format using pydub.
+    Returns path to temporary WAV file, or None if conversion fails.
+    """
+    if not PYDUB_AVAILABLE:
+        logger.warning("pydub not available for MP3 conversion")
+        return None
+    
+    try:
+        logger.info(f"Converting MP3 to WAV: {mp3_path}")
+        audio = AudioSegment.from_mp3(mp3_path)
+        
+        # Export to temporary WAV file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as wav_tmp:
+            wav_path = wav_tmp.name
+        
+        audio.export(wav_path, format="wav")
+        logger.info(f"Successfully converted to WAV: {wav_path}")
+        return wav_path
+    except Exception as e:
+        logger.error(f"Failed to convert MP3 to WAV: {type(e).__name__}: {str(e)}")
+        return None
 
 @app.errorhandler(404)
 def not_found_error(error):
