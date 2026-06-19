@@ -8,13 +8,6 @@ import os
 import logging
 import tempfile
 
-try:
-    from pydub import AudioSegment
-    PYDUB_AVAILABLE = True
-except ImportError:
-    PYDUB_AVAILABLE = False
-    AudioSegment = None
-
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -87,38 +80,16 @@ def extract_features(audio_path):
 
         logger.info(f"Loading audio file: {audio_path}")
         
-        # Try to load with librosa first
         try:
             y, sr = librosa.load(audio_path, sr=SAMPLE_RATE, duration=DURATION)
-            logger.info(f"Audio loaded successfully with librosa. Sample rate: {sr}, Duration: {len(y)/sr:.2f}s")
+            logger.info(f"Audio loaded successfully. Sample rate: {sr}, Duration: {len(y)/sr:.2f}s")
         except Exception as librosa_error:
-            logger.warning(f"Librosa failed to load audio: {str(librosa_error)}")
+            logger.error(f"Librosa failed to load audio: {type(librosa_error).__name__}: {str(librosa_error)}")
             
-            # If it's an MP3 file and librosa failed, try pydub conversion
+            # Check if it's an MP3 file
             if audio_path.lower().endswith('.mp3'):
-                logger.info("Attempting MP3 conversion via pydub...")
-                wav_path = convert_mp3_to_wav(audio_path)
-                if wav_path:
-                    try:
-                        y, sr = librosa.load(wav_path, sr=SAMPLE_RATE, duration=DURATION)
-                        logger.info(f"Successfully loaded converted WAV. Sample rate: {sr}")
-                        # Clean up the converted file
-                        try:
-                            os.unlink(wav_path)
-                        except:
-                            pass
-                    except Exception as e:
-                        logger.error(f"Failed to load converted WAV: {str(e)}")
-                        try:
-                            os.unlink(wav_path)
-                        except:
-                            pass
-                        return None, None
-                else:
-                    logger.error("MP3 to WAV conversion failed")
-                    return None, None
+                raise ValueError("MP3 files require ffmpeg which is not available on this server. Please convert your MP3 file to WAV format and try again. You can use online converters like CloudConvert or Audacity.")
             else:
-                # For other formats, re-raise the error
                 raise librosa_error
         
         if len(y) == 0:
@@ -150,8 +121,12 @@ def extract_features(audio_path):
         
         logger.info("Feature extraction successful")
         return mel_spec_norm.reshape(1, -1), freq_data
+    except ValueError as e:
+        # User-friendly error message
+        logger.error(f"ValueError: {str(e)}")
+        raise
     except librosa.LibrosaError as e:
-        logger.error(f"Librosa error processing audio: {str(e)} - File format may not be supported or file may be corrupted")
+        logger.error(f"Librosa error processing audio: {str(e)}")
         return None, None
     except Exception as e:
         logger.error(f"Unexpected error processing audio: {type(e).__name__}: {str(e)}")
@@ -161,31 +136,6 @@ ALLOWED_EXTENSIONS = {'wav', 'mp3', 'ogg'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-def convert_mp3_to_wav(mp3_path):
-    """
-    Convert MP3 file to WAV format using pydub.
-    Returns path to temporary WAV file, or None if conversion fails.
-    """
-    if not PYDUB_AVAILABLE:
-        logger.warning("pydub not available for MP3 conversion")
-        return None
-    
-    try:
-        logger.info(f"Converting MP3 to WAV: {mp3_path}")
-        audio = AudioSegment.from_mp3(mp3_path)
-        
-        # Export to temporary WAV file
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as wav_tmp:
-            wav_path = wav_tmp.name
-        
-        audio.export(wav_path, format="wav")
-        logger.info(f"Successfully converted to WAV: {wav_path}")
-        return wav_path
-    except Exception as e:
-        logger.error(f"Failed to convert MP3 to WAV: {type(e).__name__}: {str(e)}")
-        return None
-
 @app.errorhandler(404)
 def not_found_error(error):
     return render_template('error.html', error='Page not found'), 404
@@ -243,6 +193,10 @@ def analyze_audio():
                 }
             }
             return jsonify(result)
+    except ValueError as e:
+        # Handle user-friendly error messages like MP3 format errors
+        logger.error(f"Validation error: {str(e)}")
+        return jsonify({'error': str(e), 'success': False}), 400
     except Exception as e:
         logger.error(f"Error during analysis: {type(e).__name__}: {str(e)}", exc_info=True)
         return jsonify({'error': f'Analysis error: {str(e)}', 'success': False}), 500
