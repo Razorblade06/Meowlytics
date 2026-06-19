@@ -1,0 +1,62 @@
+[
+    {
+        "id": 1,
+        "emotion": "Angry_Aug",
+        "description": "Cat sound indicating aggression or anger",
+        "frequency_range": "High frequency hisses"
+    },
+    {
+        "id": 2,
+        "emotion": "Defence_Aug",
+        "description": "Cat sound indicating defensive behavior",
+        "frequency_range": "Variable frequency growls and hisses"
+    },
+    {
+        "id": 3,
+        "emotion": "Fighting_Aug",
+        "description": "Cat sound during combat or aggressive confrontation",
+        "frequency_range": "High intensity vocalizations"
+    },
+    {
+        "id": 4,
+        "emotion": "Happy_Aug",
+        "description": "Cat sound indicating contentment or happiness",
+        "frequency_range": "Purring sounds"
+    },
+    {
+        "id": 5,
+        "emotion": "Hunting Mind_Aug",
+        "description": "Cat sound indicating hunting instinct or focus",
+        "frequency_range": "Chittering and trilling sounds"
+    },
+    {
+        "id": 6,
+        "emotion": "Mating_Aug",
+        "description": "Cat sound during mating season",
+        "frequency_range": "Yowling and high-pitched calls"
+    },
+    {
+        "id": 7,
+        "emotion": "Mothercall_Aug",
+        "description": "Mother cat calling to kittens",
+        "frequency_range": "Soft chirping and calling sounds"
+    },
+    {
+        "id": 8,
+        "emotion": "Paining_Aug",
+        "description": "Cat sound indicating pain or discomfort",
+        "frequency_range": "Low frequency cries"
+    },
+    {
+        "id": 9,
+        "emotion": "Resting_Aug",
+        "description": "Cat sound during rest or sleep state",
+        "frequency_range": "Soft purring and gentle vocalizations"
+    },
+    {
+        "id": 10,
+        "emotion": "Warning_Aug",
+        "description": "Cat sound indicating warning or caution",
+        "frequency_range": "Hisses and low growls"
+    }
+]

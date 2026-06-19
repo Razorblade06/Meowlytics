@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Meowlytics</string>
+    <string name="record_button_text">Record Audio</string>
+    <string name="analyze_button_text">Analyze</string>
+    <string name="status_ready">Ready to record</string>
+    <string name="status_recording">Recording... (5 seconds)</string>
+    <string name="status_complete">Recording complete. Ready to analyze.</string>
+    <string name="status_analyzing">Analyzing audio...</string>
+    <string name="error_no_recording">No recording found. Please record first.</string>
+    <string name="error_failed_to_record">Failed to start recording</string>
+    <string name="error_permissions_required">Permissions are required to use this app</string>
+</resources>

@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify
+from flask_cors import CORS
 import numpy as np
 import librosa
 import joblib
@@ -16,6 +17,12 @@ app = Flask(
     template_folder=str(Path(__file__).parent / "templates"),
     static_folder=str(Path(__file__).parent / "static")
 )
+
+# Enable CORS for mobile app and web requests
+CORS(app, resources={
+    r"/analyze": {"origins": "*", "methods": ["POST", "OPTIONS"]},
+    r"/": {"origins": "*", "methods": ["GET", "OPTIONS"]}
+})
 
 # Constants for audio processing
 SAMPLE_RATE = 22050
@@ -71,7 +78,10 @@ def extract_features(audio_path):
             logger.error(f"Audio file not found at {audio_path}")
             return None, None
 
+        logger.info(f"Loading audio file: {audio_path}")
         y, sr = librosa.load(audio_path, sr=SAMPLE_RATE, duration=DURATION)
+        logger.info(f"Audio loaded successfully. Sample rate: {sr}, Duration: {len(y)/sr:.2f}s")
+        
         if len(y) == 0:
             logger.error("Audio file is empty or corrupted")
             return None, None
@@ -99,9 +109,13 @@ def extract_features(audio_path):
         mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)
         mel_spec_norm = (mel_spec_db - mel_spec_db.min()) / (mel_spec_db.max() - mel_spec_db.min())
         
+        logger.info("Feature extraction successful")
         return mel_spec_norm.reshape(1, -1), freq_data
+    except librosa.LibrosaError as e:
+        logger.error(f"Librosa error processing audio: {str(e)} - File format may not be supported or file may be corrupted")
+        return None, None
     except Exception as e:
-        logger.error(f"Error processing audio: {str(e)}")
+        logger.error(f"Unexpected error processing audio: {type(e).__name__}: {str(e)}")
         return None, None
 
 ALLOWED_EXTENSIONS = {'wav', 'mp3', 'ogg'}
@@ -136,13 +150,17 @@ def analyze_audio():
         logger.warning(f"Invalid file type: {file.filename}")
         return jsonify({'error': 'Invalid file type. Please upload WAV, MP3, or OGG files', 'success': False}), 400
 
+    tmp_path = None
     try:
         # Use tempfile to safely handle uploaded files
         with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as tmp:
-            file.save(tmp.name)
-            features, freq_data = extract_features(tmp.name)
+            tmp_path = tmp.name
+            file.save(tmp_path)
+            logger.info(f"File saved to temporary location: {tmp_path}")
+            
+            features, freq_data = extract_features(tmp_path)
             if features is None:
-                return jsonify({'error': 'Error processing audio file', 'success': False}), 400
+                return jsonify({'error': 'Error processing audio file - file may be corrupted or unsupported format', 'success': False}), 400
 
             if model is None or label_encoder is None:
                 return jsonify({'error': 'Model not loaded', 'success': False}), 500
@@ -163,14 +181,16 @@ def analyze_audio():
             }
             return jsonify(result)
     except Exception as e:
-        logger.error(f"Error during analysis: {str(e)}")
-        return jsonify({'error': str(e), 'success': False}), 500
+        logger.error(f"Error during analysis: {type(e).__name__}: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Analysis error: {str(e)}', 'success': False}), 500
     finally:
         # Clean up temporary file
-        try:
-            os.unlink(tmp.name)
-        except Exception as e:
-            logger.error(f"Error deleting temporary file: {str(e)}")
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+                logger.info(f"Temporary file cleaned up: {tmp_path}")
+            except Exception as e:
+                logger.error(f"Error deleting temporary file {tmp_path}: {str(e)}")
 
 # Update the app configuration
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
